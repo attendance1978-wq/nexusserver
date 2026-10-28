@@ -64,5 +64,11 @@ class Request:
         parsed = parse_qs(self.body.decode("utf-8"), keep_blank_values=True)
         return {k: v[0] for k, v in parsed.items()}
 
+    def multipart(self):
+        """Parse a ``multipart/form-data`` body into a ``MultipartForm`` (``.fields``, ``.files``)."""
+        from .multipart import parse_multipart
+
+        return parse_multipart(self.body, self.content_type)
+
     def __repr__(self) -> str:
         return f"<Request {self.method} {self.path}>"

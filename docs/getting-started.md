@@ -3,7 +3,7 @@
 ## Install
 
 ```bash
-git clone https://github.com/attendance1978-wq/nexusserver && cd nexusserver
+git clone <your repo> && cd nexusserver
 pip install -e .
 ```
 

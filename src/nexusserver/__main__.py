@@ -5,7 +5,7 @@ import importlib
 import os
 import sys
 
-from ._version import __version__
+from ._version import LTS, __version__
 from .application import Application
 
 
@@ -16,11 +16,18 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=None, help="Bind port (default: 8000)")
     parser.add_argument("--workers", type=int, default=None, help="Thread pool size (default: 16)")
     parser.add_argument("--debug", action="store_true", help="Debug logging and error details in 500 responses")
-    parser.add_argument("--reload", action="store_true", help="Reserved: auto-reload is not implemented yet")
-    parser.add_argument("--version", action="version", version=f"nexusserver {__version__}")
+    parser.add_argument("--reload", action="store_true", help="Restart the server when .py files change (development only)")
+    parser.add_argument("--version", action="version", version=f"nexusserver {__version__}" + (" (LTS)" if LTS else ""))
     args = parser.parse_args()
     if not args.app:
         parser.error("the following arguments are required: app")
+
+    if args.reload:
+        from .reload import run_with_reloader
+
+        argv = [a for a in sys.argv[1:] if a != "--reload"]
+        run_with_reloader(argv)
+        return
 
     # The `nexusserver` console script does not put the working directory on sys.path.
     if os.getcwd() not in sys.path:
@@ -46,7 +53,6 @@ def main() -> None:
     if args.workers:
         app.config.max_workers = args.workers
     app.config.debug = app.config.debug or args.debug
-    app.config.reload = args.reload
 
     app.run()
 

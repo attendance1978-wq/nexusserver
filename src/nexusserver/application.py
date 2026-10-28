@@ -8,11 +8,12 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
-from ._version import __version__
+from ._version import LTS, __version__
 from .config import Config
 from .exceptions import HTTPError, InternalServerError
 from .http.request import Request
 from .http.response import Response
+from .staticfiles import StaticFiles
 from .middleware.request_log import RequestLogMiddleware
 from .middleware.security import SecurityHeadersMiddleware
 from .routing.router import Router
@@ -32,6 +33,7 @@ class Application:
         self.lifecycle = Lifecycle()
         self._middleware: list[Callable[[Callable], Callable]] = []
         self._built: Handler | None = None
+        self._error_handlers: dict[type[BaseException] | int, Callable] = {}
         self._engine: HTTPEngine | None = None
 
         # Default middleware (outermost first): security headers, request logging
@@ -53,6 +55,74 @@ class Application:
 
     def delete(self, path: str, **kwargs):
         return self.router.delete(path, **kwargs)
+
+    # ----- static files -----
+    def static(self, url_prefix: str, directory, index: str | None = "index.html", max_age: int = 3600) -> StaticFiles:
+        """Serve ``directory`` under ``url_prefix`` (GET/HEAD, with ETag and 304 support)."""
+        files = StaticFiles(directory, index=index, max_age=max_age)
+        prefix = "/" + url_prefix.strip("/")
+        prefix = "" if prefix == "/" else prefix
+
+        def serve_file(request: Request, filepath: str) -> Response:
+            return files.serve(request, filepath)
+
+        def serve_root(request: Request) -> Response:
+            return files.serve(request, "")
+
+        self.router.add_route(f"{prefix}/<path:filepath>", serve_file, methods=["GET"])
+        self.router.add_route(prefix or "/", serve_root, methods=["GET"])
+        if prefix:
+            self.router.add_route(prefix + "/", serve_root, methods=["GET"])
+        return files
+
+    # ----- error handlers -----
+    def errorhandler(self, target: type[BaseException] | int):
+        """Register ``handler(request, exc)`` for an exception class or HTTP status code.
+
+        >>> @app.errorhandler(404)
+        ... def not_found(request, exc):
+        ...     return {"error": "not found", "path": request.path}, 404
+        """
+
+        def decorator(func: Callable) -> Callable:
+            self._error_handlers[target] = func
+            return func
+
+        return decorator
+
+    def _find_error_handler(self, exc: BaseException) -> Callable | None:
+        """Most specific wins: exact class, then HTTP status code, then base classes."""
+        handlers = self._error_handlers
+        if type(exc) in handlers:
+            return handlers[type(exc)]
+        status = getattr(exc, "status_code", None)
+        if isinstance(status, int) and status in handlers:
+            return handlers[status]
+        for cls in type(exc).__mro__[1:]:
+            if cls in handlers:
+                return handlers[cls]
+        return None
+
+    def _handle_error(self, request: Request, exc: BaseException) -> Response:
+        handler = self._find_error_handler(exc)
+        if handler is not None:
+            try:
+                result = handler(request, exc)
+                if not isinstance(result, (tuple, Response)):
+                    # No explicit status: use the exception's (500 for non-HTTP errors).
+                    result = (result, getattr(exc, "status_code", 500))
+                response = self._to_response(result)
+                for name, value in getattr(exc, "headers", {}).items():
+                    if name not in response.headers:
+                        response.headers[name] = value
+                return response
+            except Exception:
+                logger.exception("Error handler for %s failed", type(exc).__name__)
+        if isinstance(exc, HTTPError):
+            return self._error_response(exc)
+        logger.error("Unhandled error in %s %s", request.method, request.path, exc_info=exc)
+        detail = f"{type(exc).__name__}: {exc}" if self.config.debug else None
+        return self._error_response(InternalServerError(detail))
 
     # ----- lifecycle hooks -----
     def on_startup(self, func: Callable[[], Any]) -> Callable[[], Any]:
@@ -79,12 +149,8 @@ class Application:
                 handler, params = self.router.resolve(request)
                 request.path_params = params
                 return self._invoke(handler, request)
-            except HTTPError as exc:
-                return self._error_response(exc)
             except Exception as exc:
-                logger.exception("Unhandled error in %s %s", request.method, request.path)
-                detail = f"{type(exc).__name__}: {exc}" if self.config.debug else None
-                return self._error_response(InternalServerError(detail))
+                return self._handle_error(request, exc)
 
         handler: Handler = endpoint
         for middleware_cls in reversed(self._middleware):
@@ -147,9 +213,7 @@ class Application:
     # ----- lifecycle -----
     def run(self) -> None:
         logging.basicConfig(level=logging.DEBUG if self.config.debug else logging.INFO)
-        if self.config.reload:
-            logger.warning("Auto-reload is not implemented yet; restart the server to pick up changes.")
-        logger.info("NexusServer %s", __version__)
+        logger.info("NexusServer %s%s", __version__, " (LTS)" if LTS else "")
         self.lifecycle.startup()
         self._engine = HTTPEngine(self.handle, self.config)
         try:

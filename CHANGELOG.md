@@ -1,5 +1,69 @@
 # Changelog
 
+## 26.4.0
+
+Regular feature release (the 26.3.x LTS line is unchanged and keeps receiving fixes only).
+
+### Added: nexuspy, Python environment management
+A new core, `nexusserver.nexuspy`, with a `nexuspy` command (also `python -m nexusserver.nexuspy`).
+See [docs/nexuspy.md](docs/nexuspy.md).
+- Create, list, inspect and remove virtual environments under `~/.nexuspy` (`NEXUSPY_HOME`).
+- Pick the interpreter by version (`--python 3.11`) or path; `nexuspy pythons` lists what is installed.
+- Install / uninstall packages, `freeze`, `lock`, `sync` and `clone` environments.
+- `run` a command inside an environment, `shell`, `activate` snippets (bash, zsh, fish, PowerShell, cmd).
+- `use` / `current` bind a project directory to an environment.
+- `doctor` health checks.
+- Management HTTP API on NexusServer (`nexuspy serve`), bearer-token protected, loopback by default.
+- Python API: `EnvManager`, `discover_pythons`, `find_python`, typed errors.
+- `BearerTokenMiddleware` (usable in any app).
+- Safety: names are validated, package specs that look like pip options are refused,
+  commands are never run through a shell, `remove` refuses symlinked or foreign directories.
+
+### Changed
+- `nexusserver.LTS` / `RELEASE_CHANNEL` now reflect the line: `False` / `"stable"` on 26.4, and
+  `True` / `"lts"` on 26.3.x. New `LATEST_LTS` constant.
+
+## 26.3.0 (LTS)
+
+First **Long-Term Support** release: the 26.3.x line gets bug and security fixes for
+24 months and keeps its public API stable. See [docs/release-policy.md](docs/release-policy.md)
+and [SECURITY.md](SECURITY.md). Drop-in upgrade from 26.2 (see the notes there).
+
+### Added
+- **Keep-alive connections** with pipelining, `Connection: close` handling,
+  `Keep-Alive` header, idle timeout (`keep_alive_timeout`) and a per-connection
+  request cap (`max_keepalive_requests`). Idle connections are woken on shutdown.
+- **Chunked request bodies** (`Transfer-Encoding: chunked`), including
+  `Expect: 100-continue`. Other transfer codings still return 501.
+- **`--reload`**: a working development auto-reloader (`nexusserver.reload`).
+- **File uploads:** `Request.multipart()` returns a `MultipartForm`
+  (`fields`, `files`, `all_files`); `UploadedFile.save()` writes safely.
+- **`app.static(prefix, directory)`**: static mount with `ETag`, `Last-Modified`,
+  `Cache-Control`, 304 responses, directory index, traversal protection
+  (`StaticFiles` class).
+- **`@app.errorhandler(404 | ExceptionClass)`**: custom error responses, including
+  a catch-all for unexpected exceptions.
+- **Security:**
+  - `RateLimitMiddleware` (429, `Retry-After`, `X-RateLimit-*`)
+  - `SignedSessionMiddleware` (HMAC-signed cookie sessions)
+  - `BasicAuthMiddleware`
+  - `nexusserver.security`: `hash_password` / `verify_password` (scrypt), `sign` / `unsign`
+- `secure_filename()`; `Response`/`Headers` unchanged apart from the above.
+- `LTS`, `RELEASE_CHANNEL`, `__version_info__`; `nexusserver --version` prints `(LTS)`.
+- Docs: release policy, security guide, uploads and static files, `SECURITY.md`.
+- Examples: `upload_app`, `auth_app`, `error_handlers`, `rate_limit_app`, `static_mount`.
+- Tests: 100 (from 53), including real-socket tests for keep-alive, pipelining, chunked
+  bodies and shutdown.
+
+### Changed
+- `Config.keep_alive` defaults to `True` (it was `False` in 26.2 because it was not implemented).
+  Set it to `False` for one request per connection.
+- `Config.reload` is now set by the CLI; it is no longer "reserved".
+- `HEAD`, `204` and `304` responses never carry a body.
+
+### Fixed
+- Pipelined requests no longer lose data left over after the first request.
+
 ## 26.2.0
 
 Versioning is now CalVer (`YY.minor.patch`). The version lives in one place,

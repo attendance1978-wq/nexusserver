@@ -6,6 +6,7 @@ import re
 from urllib.parse import unquote, urlsplit
 
 from ..exceptions import BadRequest, NotImplementedError_, PayloadTooLarge
+from .chunked import dechunk
 from .headers import Headers
 from .request import Request
 
@@ -47,19 +48,28 @@ def parse_request(
     method, target, version = parse_request_line(lines[0])
     headers = parse_headers(lines[1:])
 
-    if "Transfer-Encoding" in headers:
-        raise NotImplementedError_("Transfer-Encoding request bodies are not supported")
-    try:
-        content_length = int(headers.get("Content-Length", "0") or 0)
-    except ValueError:
-        raise BadRequest("Invalid Content-Length") from None
-    if content_length < 0:
-        raise BadRequest("Invalid Content-Length")
-    if content_length > max_body_size:
-        raise PayloadTooLarge("Request body too large")
-    if len(body) < content_length:
-        raise BadRequest("Incomplete request body")
-    body = body[:content_length]  # no Content-Length => no body
+    transfer_encoding = headers.get("Transfer-Encoding", "").strip().lower()
+    if transfer_encoding:
+        if transfer_encoding != "chunked":
+            raise NotImplementedError_("Only 'chunked' Transfer-Encoding is supported")
+        if "Content-Length" in headers:
+            raise BadRequest("Both Transfer-Encoding and Content-Length were sent")
+        decoded = dechunk(body, max_body_size)
+        if decoded is None:
+            raise BadRequest("Incomplete chunked body")
+        body = decoded[0]
+    else:
+        try:
+            content_length = int(headers.get("Content-Length", "0") or 0)
+        except ValueError:
+            raise BadRequest("Invalid Content-Length") from None
+        if content_length < 0:
+            raise BadRequest("Invalid Content-Length")
+        if content_length > max_body_size:
+            raise PayloadTooLarge("Request body too large")
+        if len(body) < content_length:
+            raise BadRequest("Incomplete request body")
+        body = body[:content_length]  # no Content-Length => no body
 
     parts = urlsplit(target)
     return Request(

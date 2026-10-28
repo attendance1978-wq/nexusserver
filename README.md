@@ -3,7 +3,7 @@
 A lightweight, pure-Python HTTP server and web framework: routing, middleware,
 cookies, sessions, SQLite helpers. No dependencies beyond the standard library.
 
-**Version 26.2.0** (see [CHANGELOG](CHANGELOG.md)) · Python 3.9+ · MIT
+**Version 26.4.0** · latest LTS line: 26.3.x (see [CHANGELOG](CHANGELOG.md) and the [release policy](docs/release-policy.md)) · Python 3.9+ · MIT
 
 ## Install
 
@@ -36,13 +36,17 @@ nexusserver examples.hello_server:app --port 8080
 
 ## Features
 
-- Threaded HTTP/1.1 server (one request per connection)
+- Threaded HTTP/1.1 server with keep-alive, pipelining and chunked request bodies
+- **nexuspy**: Python environment manager (create/clone/lock environments, run commands in them, HTTP API)
+- Auto-reload for development (`--reload`)
 - Decorator routing with `<int:id>`, `<str:name>`, `<path:rest>`
 - Handlers return `str`, `bytes`, `dict`/`list` (JSON), `Response`, or `(body, status[, headers])`
-- Middleware: CORS, security headers, sessions, gzip, request logging (+ your own)
+- Middleware: CORS, security headers, sessions (in-memory or signed cookies), rate limiting, Basic auth, gzip, request logging (+ your own)
+- Custom error handlers: `@app.errorhandler(404)`
+- File uploads (`request.multipart()`) and `app.static()` mounts with ETag/304
+- Password hashing and signing helpers (`nexusserver.security`)
 - Cookies, form and JSON bodies, query strings
 - SQLite helper with one-shot, idempotent migrations
-- Static file helpers with path-traversal protection
 
 ## Documentation
 
@@ -54,7 +58,11 @@ nexusserver examples.hello_server:app --port 8080
 | [Middleware](docs/middleware.md) | Built-ins, options, ordering, writing your own |
 | [Database](docs/database.md) | SQLite, migrations, threading |
 | [Configuration](docs/configuration.md) | `Config` fields and CLI flags |
-| [Limitations](docs/limitations.md) | What it does not do yet, production notes |
+| [nexuspy](docs/nexuspy.md) | Python environment management: CLI, Python API, HTTP API |
+| [Uploads and static files](docs/uploads-and-static.md) | multipart forms, `app.static()` |
+| [Security](docs/security.md) | Passwords, signed sessions, Basic auth, rate limiting, checklist |
+| [Release policy](docs/release-policy.md) | LTS support window, upgrade notes |
+| [Limitations](docs/limitations.md) | What it does not do, production notes |
 
 ## Examples
 
@@ -70,6 +78,20 @@ All in [`examples/`](examples/), each runnable with `python -m nexusserver examp
 | `sessions_app.py` | Sessions, login/logout |
 | `middleware_app.py` | Configured CORS + gzip and a custom middleware |
 | `notes_api.py` | Everything together: migrations, lifecycle hooks, CORS, validation |
+| `upload_app.py` | multipart file uploads with size and type checks |
+| `auth_app.py` | Password hashing, signed sessions, Basic auth for an admin area |
+| `error_handlers.py` | Custom JSON errors by status, class, and catch-all |
+| `rate_limit_app.py` | Rate limiting with an exempt health check |
+| `static_mount.py` | `app.static()` with caching headers |
+
+## nexuspy in 30 seconds
+
+```bash
+nexuspy create web flask            # new environment with Flask installed
+nexuspy run web -- python -c "import flask; print(flask.__version__)"
+nexuspy lock web                    # writes nexuspy.lock
+nexuspy clone web web-copy
+```
 
 ## Tests
 

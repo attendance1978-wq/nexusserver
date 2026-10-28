@@ -1,6 +1,6 @@
 """NexusServer: a lightweight, pure-Python web framework and HTTP server."""
 
-from ._version import __version__
+from ._version import LTS, RELEASE_CHANNEL, __version__, __version_info__
 from .application import Application, NexusServer
 from .config import Config
 from .exceptions import (
@@ -18,7 +18,9 @@ from .exceptions import (
 from .http.headers import Headers
 from .http.request import Request
 from .http.response import Response
+from .http.multipart import MultipartForm, UploadedFile
 from .routing.router import Router
+from .staticfiles import StaticFiles
 
 __all__ = [
     "Application",
@@ -28,6 +30,9 @@ __all__ = [
     "Request",
     "Response",
     "Router",
+    "StaticFiles",
+    "MultipartForm",
+    "UploadedFile",
     "NexusServerError",
     "HTTPError",
     "BadRequest",
@@ -39,4 +44,7 @@ __all__ = [
     "UnprocessableEntity",
     "InternalServerError",
     "__version__",
+    "__version_info__",
+    "LTS",
+    "RELEASE_CHANNEL",
 ]

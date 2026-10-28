@@ -45,9 +45,25 @@ def test_body_limit():
         parse_request(b"POST /x HTTP/1.1\r\nContent-Length: 10\r\n\r\n0123456789", max_body_size=5)
 
 
-def test_chunked_is_501():
+def test_chunked_body_is_decoded():
+    raw = (b"POST /x HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n"
+           b"5\r\nhello\r\n6\r\n world\r\n0\r\n\r\n")
+    assert parse_request(raw).body == b"hello world"
+
+
+def test_incomplete_chunked_body_is_400():
+    with pytest.raises(BadRequest):
+        parse_request(b"POST /x HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhel")
+
+
+def test_chunked_plus_content_length_is_400():
+    with pytest.raises(BadRequest):
+        parse_request(b"POST /x HTTP/1.1\r\nTransfer-Encoding: chunked\r\nContent-Length: 3\r\n\r\n0\r\n\r\n")
+
+
+def test_unsupported_transfer_encoding_is_501():
     with pytest.raises(NotImplementedError_):
-        parse_request(b"POST /x HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n")
+        parse_request(b"POST /x HTTP/1.1\r\nTransfer-Encoding: gzip\r\n\r\n")
 
 
 def test_path_is_percent_decoded():

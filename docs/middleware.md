@@ -38,6 +38,9 @@ middleware, so middleware always sees a `Response` (including 404/405/500).
 | `RequestLogMiddleware` | none | One log line per request on `nexusserver.access`. Default. |
 | `CORSMiddleware` | `allow_origins`, `allow_methods`, `allow_headers`, `allow_credentials`, `max_age` | Answers `OPTIONS` preflight with 204. With credentials and `"*"`, the request's origin is echoed back, so prefer an explicit allow-list. |
 | `GZipMiddleware` | `minimum_size=500` | Compresses when the client sends `Accept-Encoding: gzip`. |
+| `SignedSessionMiddleware` | `secret_key` (required), `cookie_name`, `max_age=14d`, `secure`, `samesite` | Session stored in a signed (not encrypted) cookie. See [security](security.md). |
+| `RateLimitMiddleware` | `limit=100`, `window=60`, `key_func`, `exempt_paths`, `clock` | 429 + `Retry-After` over the limit; `X-RateLimit-*` headers. See [security](security.md). |
+| `BasicAuthMiddleware` | `users` or `verify`, `realm`, `exempt_paths` | HTTP Basic auth; `request.state["user"]`. See [security](security.md). |
 | `SessionMiddleware` | `cookie_name="nexussession"`, `max_age=None`, `secure=False` | In-memory sessions at `request.state["session"]`. |
 
 ## Sessions

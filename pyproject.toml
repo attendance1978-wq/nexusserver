@@ -26,6 +26,7 @@ classifiers = [
 
 [project.scripts]
 nexusserver = "nexusserver.__main__:main"
+nexuspy = "nexusserver.nexuspy.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

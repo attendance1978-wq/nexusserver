@@ -11,6 +11,7 @@
 | `body` / `text()` | Raw bytes / decoded text |
 | `json()` | Parsed JSON body, or `None` if the body is empty (raises `ValueError` on bad JSON) |
 | `form()` | `dict` from an `application/x-www-form-urlencoded` body |
+| `multipart()` | `MultipartForm` from a `multipart/form-data` body (see [uploads](uploads-and-static.md)) |
 | `path_params` | Converted route parameters |
 | `client` | `(ip, port)` |
 | `state` | Per-request `dict` for middleware to share data (sessions use it) |
@@ -76,6 +77,29 @@ Pass `headers={...}` to attach response headers.
 
 Any other exception becomes `500 Internal Server Error` and is logged with a
 traceback. The message is only included in the response when `Config.debug` is on.
+
+### Custom error handlers
+
+```python
+@app.errorhandler(404)                      # by status code
+def not_found(request, exc):
+    return {"error": "not found", "path": request.path}, 404
+
+@app.errorhandler(MyDomainError)            # by exception class (subclasses match too)
+def domain(request, exc):
+    return {"error": str(exc)}, 409
+
+@app.errorhandler(Exception)                # last resort for unexpected errors
+def crash(request, exc):
+    return {"error": "internal"}, 500
+```
+
+Handlers take `(request, exc)` and return anything a normal handler may. If you return
+no status, the exception's own status is used (500 for non-HTTP errors). Lookup order
+(most specific wins): the exception's exact class, then its HTTP status code, then its base
+classes (`HTTPError`, `Exception`, ...).
+Headers carried by the exception (e.g. `Allow` on 405) are kept. If a handler itself
+raises, the default error response is used.
 
 For input checks, `nexusserver.utils.validation` provides `require_fields(data, [...])`
 and `as_int(value, default=None)`, both raising `BadRequest`.
